@@ -22,6 +22,15 @@ func TestRuntimeRosterAcceptsSeveralExactReadySources(t *testing.T) {
 	if !ok || len(sources) != 2 || sources[1].(map[string]any)["streamUrl"] != "http://127.0.0.1:28090/sources/world" {
 		t.Fatalf("runtime sources=%#v", result.Output["sources"])
 	}
+	for _, source := range sources {
+		projected := source.(map[string]any)
+		if _, leaked := projected["controlSocket"]; leaked {
+			t.Fatalf("runtime roster leaked a control socket: %#v", projected)
+		}
+		if _, leaked := projected["rtpPort"]; leaked {
+			t.Fatalf("runtime roster leaked an RTP port: %#v", projected)
+		}
+	}
 }
 
 func TestRuntimeRosterRejectsMisalignmentAndEveryDuplicateAuthority(t *testing.T) {
@@ -34,12 +43,6 @@ func TestRuntimeRosterRejectsMisalignmentAndEveryDuplicateAuthority(t *testing.T
 		}},
 		{name: "duplicate source", mutate: func(input map[string]any) {
 			input["sources"].([]any)[1].(map[string]any)["sourceId"] = "front"
-		}},
-		{name: "duplicate port", mutate: func(input map[string]any) {
-			input["sources"].([]any)[1].(map[string]any)["rtpPort"] = int64(5104)
-		}},
-		{name: "duplicate socket", mutate: func(input map[string]any) {
-			input["sources"].([]any)[1].(map[string]any)["controlSocket"] = "/tmp/xgc2/media/front.sock"
 		}},
 		{name: "duplicate runtime", mutate: func(input map[string]any) {
 			input["cameraExternalIdentities"].([]any)[1] = "camera-front-process"
@@ -64,15 +67,14 @@ func TestRuntimeRosterRejectsMisalignmentAndEveryDuplicateAuthority(t *testing.T
 func validInput() map[string]any {
 	return map[string]any{
 		"edgeBindingId": "media-edge", "edgeUrl": "http://127.0.0.1:28090", "edgeExternalIdentity": "media-edge-process",
+		"rosterArtifactRef": "camera-source-roster-fixture", "rosterDigest": "sha256:613f37ed7bedc20b3933fdb6ff08f56f677160379899de45d9ab09aa06839221",
 		"sources": []any{
 			map[string]any{
-				"bindingId": "camera-front", "sourceId": "front", "rtpPort": int64(5104),
-				"controlSocket": "/tmp/xgc2/media/front.sock", "imageTopic": "/xgc/camera/front/video_h264",
+				"bindingId": "camera-front", "sourceId": "front", "imageTopic": "/xgc/camera/front/video_h264",
 				"cameraInfoTopic": "/xgc/camera/front/camera_info",
 			},
 			map[string]any{
-				"bindingId": "camera-world", "sourceId": "world", "rtpPort": int64(5106),
-				"controlSocket": "/tmp/xgc2/media/world.sock", "imageTopic": "/xgc/camera/world/video_h264",
+				"bindingId": "camera-world", "sourceId": "world", "imageTopic": "/xgc/camera/world/video_h264",
 				"cameraInfoTopic": "/xgc/camera/world/camera_info",
 			},
 		},
